@@ -87,6 +87,14 @@ function filesystem.getLetter()
 	return current
 end
 
+function filesystem.getMounted()
+	local list = {}
+	for each, disk in pairs(hard_drives) do
+		table.insert(list, each)
+	end
+	return list
+end
+
 -- Here begin re-implementations of the standard filesystem API
 -- to redirect them to the currently selected drive, because that's
 -- how I do it.

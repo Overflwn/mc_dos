@@ -40,17 +40,105 @@ _G.loadfile = function(file, env)
 end
 
 loadfile("/mc_dos/libraries/core/02_package.lua")()
+local list = filesystem.list("/mc_dos/libraries/core/")
+for each, file in ipairs(list) do
+  if file ~= "01_filesystem.lua" and file ~= "02_package.lua" then
+    local func, err = loadfile("/mc_dos/libraries/core/"..file)
+    assert(func, "COULD NOT LOAD '"..file.."': "..tostring(err))
+    local success, err = pcall(func)
+    assert(success, tostring(err))
+    if term then
+      term.write(file.." LOADED! ")
+      term.nextLine()
+    end
+  end
+end
 
-local component = require("component")
 local computer = require("computer")
-local gpu
-for address, typ in component.list("gpu", true) do
-  gpu = component.proxy(address)
-  gpu.fill(1, 1, 50, 50, " ")
-  gpu.set(1, 1, "Hello World!")
-  break
+--Re-implement computer.pullSignal, to make it coroutine-compatible
+local oldpull = computer.pullSignal
+function computer.pullSignal(timeout)
+  return coroutine.yield(timeout)
+end
+local timers = {}
+local last_id = 0
+function computer.setTimer(timeout)
+  local timer = {
+    timeout = timeout,
+    counter = 0,
+    id = last_id
+  }
+  last_id = last_id+1
+  table.insert(timers, timer)
+  return last_id-1
 end
 
-while true do
-  computer.pullSignal()
+function computer.sleep(timeout)
+  checkArg(1, timeout, "number")
+  if timeout < 1 then
+    return false
+  end
+  local timer = computer.setTimer(timeout)
+  repeat
+    local event, id = computer.pullSignal()
+  until event == "timer" and id == timer
 end
+term.write("Hello World!\n")
+
+local function blink()
+  local on = false
+  while true do
+    computer.sleep(1)
+    on = not on
+    local cX, cY = term.getCursorPos()
+    local gpu = term.getGPU()
+    if on then
+      gpu.set(cX, cY, "_")
+    else
+      gpu.set(cX, cY, " ")
+    end
+  end
+end
+
+local blinker = coroutine.create(blink)
+
+local func, err = loadfile("/mc_dos/bin/shell.lua")
+assert(func, tostring(err))
+local shell = coroutine.create(func)
+local ev = {}
+local last_time = computer.uptime()
+local shell_startedToWait = -1
+local blink_startedToWait = -1
+local shell_counter = 0
+local blink_counter = 0
+local shell_timeout = 0
+local shell_timeout = 0
+while true do
+  local succ, timeout = coroutine.resume(shell, unpack(ev))
+  assert(succ, timeout)
+  shell_startedToWait = computer.uptime()
+  shell_timeout = timeout
+  shell_counter = 0
+  succ, timeout = coroutine.resume(blinker, unpack(ev))
+  assert(succ, timeout)
+  blink_startedToWait = computer.uptime()
+  ev = {}
+  local newTime = computer.uptime()
+  if newTime > last_time then
+    local difference = newtime - last_time
+    local to_remove = {}
+    for each, timer in ipairs(timers) do
+      timer.counter = timer.counter+difference
+      if timer.counter >= timer.timeout then
+        computer.pushSignal("timer", timer.id)
+        table.insert(to_remove, each)
+      end
+    end
+    for each, timer in ipairs(to_remove) do
+      table.remove(timers, timer)
+    end
+  end
+
+  ev = table.pack(oldpull(0))
+end
+func()
