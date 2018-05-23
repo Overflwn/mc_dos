@@ -37,9 +37,13 @@ local function read()
             local oldX, oldY = term.getCursorPos()
             term.setCursorPos(oldX-1, oldY)
             term.getGPU().set(oldX-1, oldY, " ")
-        end
+            --fix blinker remaining there
+	    term.getGPU().set(oldX, oldY, " ")
+    	end
         --enter
     until event == "key_down" and code == 28
+    local x, y = term.getCursorPos()
+    term.getGPU().set(x, y, " ")
     term.write("\n")
     return text
 end

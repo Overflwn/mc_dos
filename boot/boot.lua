@@ -87,11 +87,11 @@ term.write("Hello World!\n")
 
 local function blink()
   local on = false
+  local gpu = term.getGPU()
   while true do
     computer.sleep(1)
     on = not on
     local cX, cY = term.getCursorPos()
-    local gpu = term.getGPU()
     if on then
       gpu.set(cX, cY, "_")
     else
@@ -114,18 +114,18 @@ local blink_counter = 0
 local shell_timeout = 0
 local shell_timeout = 0
 while true do
-  local succ, timeout = coroutine.resume(shell, unpack(ev))
+  local succ, timeout = coroutine.resume(shell, table.unpack(ev))
   assert(succ, timeout)
   shell_startedToWait = computer.uptime()
   shell_timeout = timeout
   shell_counter = 0
-  succ, timeout = coroutine.resume(blinker, unpack(ev))
+  succ, timeout = coroutine.resume(blinker, table.unpack(ev))
   assert(succ, timeout)
   blink_startedToWait = computer.uptime()
   ev = {}
   local newTime = computer.uptime()
   if newTime > last_time then
-    local difference = newtime - last_time
+    local difference = newTime - last_time
     local to_remove = {}
     for each, timer in ipairs(timers) do
       timer.counter = timer.counter+difference
